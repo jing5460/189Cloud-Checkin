@@ -124,12 +124,35 @@ class CheckinTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["notification"], "failed")
 
-    def test_telegram_uses_plain_text(self):
+    def test_telegram_uses_html(self):
         response = Mock(status_code=200)
         response.json.return_value = {"ok": True}
         with patch.object(app.requests, "post", return_value=response) as post:
             self.assertTrue(app.send_telegram_notification("text_with_[symbols]", "test-token", "test-chat"))
-        self.assertNotIn("parse_mode", post.call_args[1]["json"])
+        self.assertEqual(post.call_args[1]["json"]["parse_mode"], "HTML")
+
+    def test_notification_icons_and_counts(self):
+        results = [
+            {"username": "account-a", "status": "signed", "signin": "签到成功，获得 63M 空间", "error": None},
+            {"username": "account-b", "status": "already_signed", "signin": "今日已签到，本次未重复领取", "error": None},
+            {"username": "account-c", "status": "failed", "signin": "", "error": "登录失败"},
+        ]
+        message = app.format_notification_message(results)
+        self.assertIn("🌥️ <b>天翼云盘签到报告</b>", message)
+        for icon, account in (("🎉", "account-a"), ("✅", "account-b"), ("❌", "account-c")):
+            self.assertIn("{} <b>{}</b>".format(icon, account), message)
+        self.assertIn("共 3 个账号", message)
+        for text in ("本次签到 1", "今日已签到 1", "失败或未知 1"):
+            self.assertIn(text, message)
+
+    def test_notification_escapes_dynamic_html(self):
+        message = app.format_notification_message([
+            {"username": "a<b>&c", "status": "failed", "signin": "",
+             "error": '接口失败 <test> & "quoted" _value_'},
+        ])
+        self.assertIn("a&lt;b&gt;&amp;c", message)
+        self.assertIn("&lt;test&gt; &amp; &quot;quoted&quot; _value_", message)
+        self.assertNotIn("<test>", message)
 
 
 if __name__ == "__main__":

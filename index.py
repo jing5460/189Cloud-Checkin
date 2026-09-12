@@ -1,6 +1,7 @@
 import time
 import re
 import json
+import html
 import base64
 import os
 import rsa
@@ -117,7 +118,7 @@ def load_config(environ=None):
 
 
 def send_telegram_notification(message, token, chat_id):
-    """发送纯文本，避免接口错误信息被当成 Markdown 解析。"""
+    """发送已转义动态内容的 HTML 报告。"""
     if not token or not chat_id:
         return False
 
@@ -126,6 +127,7 @@ def send_telegram_notification(message, token, chat_id):
     payload = {
         "chat_id": chat_id,
         "text": message,
+        "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
 
@@ -328,12 +330,17 @@ def summarize(all_results):
 
 
 def format_notification_message(all_results):
-    lines = ["天翼云盘个人签到报告", ""]
+    lines = ["🌥️ <b>天翼云盘签到报告</b>", ""]
+    icons = {"signed": "🎉", "already_signed": "✅", "failed": "❌"}
     for result in all_results:
-        lines.append("{}：{}".format(result["username"], result["error"] or result["signin"]))
+        username = html.escape(str(result["username"]))
+        detail = html.escape(str(result["error"] or result["signin"]))
+        lines.extend(["{} <b>{}</b>".format(icons[result["status"]], username),
+                      detail, ""])
     counts = summarize(all_results)
-    lines.extend(["", "本次签到 {} / 今日已签到 {} / 失败或未知 {} / 总计 {}".format(
-        counts["signed"], counts["already_signed"], counts["failed"], len(all_results))])
+    lines.extend(["📊 <b>统计 · 共 {} 个账号</b>".format(len(all_results)),
+                  "🎉 本次签到 {}  ·  ✅ 今日已签到 {}  ·  ❌ 失败或未知 {}".format(
+                      counts["signed"], counts["already_signed"], counts["failed"])])
     return "\n".join(lines)
 
 
