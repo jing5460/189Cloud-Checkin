@@ -1,2 +1,6 @@
 
 *.bak
+local/
+.env
+__pycache__/
+*.py[cod]
